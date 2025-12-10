@@ -1,47 +1,65 @@
 with open("input.txt", "r") as file:
     POLYGON = [(int(coordinate.split(",")[0]), int(coordinate.split(",")[1])) for coordinate in file.read().splitlines()]
 
+is_in_polygon_cache = []
+is_not_in_polygon_cache = []
 
-VERTICAL_LINES = []
-HORIZONTAL_LINES = []
+def is_on_segment(p_x, p_y, a_x, a_y, b_x, b_y):
+    cross_product = (p_y - a_y) * (b_x - a_x) - (b_y - a_y) * (p_x - a_x)
+    if abs(cross_product) > 1e-9:
+        return False
+    
+    is_x_in_box = (min(a_x, b_x) <= p_x <= max(a_x, b_x))
+    is_y_in_box = (min(a_y, b_y) <= p_y <= max(a_y, b_y))
+    
+    return is_x_in_box and is_y_in_box
 
-for i, coord in enumerate(POLYGON):
-    if i + 1 < len(POLYGON):
-        next_coord = POLYGON[i + 1]
-    else:
-        next_coord = POLYGON[0]  # wrap around to the first coordinate
-        
-    if coord[1] == next_coord[1]:  # same y-coordinate, horizontal line
-        HORIZONTAL_LINES.append((coord, next_coord))
-    if coord[0] == next_coord[0]:  # same x-coordinate, vertical line
-        VERTICAL_LINES.append((coord, next_coord))
-
-def is_in_polygon(point: tuple[int,int]) -> bool:
+def is_in_polygon(point: tuple[int,int]):
+    if point in is_in_polygon_cache:
+        return True
+    if point in is_not_in_polygon_cache:
+        return False
     x,y = point
-    for horizontal_line in HORIZONTAL_LINES:
-        x1,y1 = horizontal_line[0]
-        x2 = horizontal_line[1][0]
-        if y != y1: 
-            continue
-        else:
-            left_x = min(x1,x2)
-            right_x = max(x1,x2)
-            if x <= right_x and x >= left_x:
-                return True, right_x # point falls on a horizontal line
+    n = len(POLYGON)
 
-    intersections = []
-    for vertical_line in VERTICAL_LINES:
-        x1,y1 = vertical_line[0]
-        y2 = vertical_line[1][1]
-        if x > x1: 
-            continue # point falls to the right of the vertical line
-        y_top = max(y1,y2)
-        y_bottom = min(y1,y2)
-        if x == x1 and y <= y_top and y >= y_bottom: 
-            return True, x # point falls on a vertical line
-        elif y <= y_top and y > y_bottom:
-            intersections.append(x1) # point falls to the left of the vertical line
-    return len(intersections) % 2 == 1, x if len(intersections) == 0 else min(intersections)
+    for i in range(n):
+        x1, y1 = POLYGON[i]
+        x2, y2 = POLYGON[(i + 1) % n]
+        
+        if is_on_segment(x, y, x1, y1, x2, y2):
+            is_in_polygon_cache.append(point)
+            return True
+            
+    # --- PART 2: Check for STRICTLY INSIDE (Optimized Ray Casting) ---
+    intersection_count = 0
+    for i in range(n):
+        x1, y1 = POLYGON[i]
+        x2, y2 = POLYGON[(i + 1) % n] 
+        
+        # 1. Check if the edge is vertical (x1 == x2)
+        if x1 == x2:
+            
+            # The x-coordinate of the intersection is x1 (or x2)
+            x_intersect = x1
+            
+            # 2. Check if the vertical edge is to the right of the test point
+            if x_intersect > x:
+                
+                # 3. Check if the test point's y_p is strictly between the edge's y-coordinates.
+                # This is the simplified straddling check that also handles the vertex rule:
+                min_y = min(y1, y2)
+                max_y = max(y1, y2)
+                
+                if min_y < y < max_y:
+                    intersection_count += 1
+                    
+    # If the count is odd, the point is strictly inside.
+    if intersection_count % 2 == 1:
+        is_in_polygon_cache.append(point)
+        return True
+    else:
+        is_not_in_polygon_cache.append(point)
+        return False
 
 largest_area = 0
 area_points = None
@@ -51,29 +69,33 @@ for point_a in POLYGON:
     points_counted += 1
     print(f"Counted {points_counted}/{points_to_count}")
     # For each point, compare against all polygon points to the right.
-    other_points = filter(lambda x: x[0] >= point_a[0], POLYGON)
-    for point_b in other_points:
-        x1,y1 = point_a
-        x2,y2 = point_b
+    for point_b in POLYGON:
+        x_a,y_a = point_a
+        x_b,y_b = point_b
+        if min(x_a,x_b) == x_a:
+            x1,y1 = point_a
+            x2,y2 = point_b
+        else:
+            x1,y1 = point_b
+            x2,y2 = point_a
         potential_rectangle_area = abs((x2 - x1 + 1)*(y2 - y1 + 1))
         # Determine if a rectangle can be formed that is larger than the current largest rectangle
         if largest_area >= potential_rectangle_area: continue
-
         is_valid_rectangle = True
         for y in range(min(y1,y2), max(y1,y2)+1):
             if not is_valid_rectangle: break
             x = x1
             while x < x2+1: 
                 if not is_valid_rectangle: break
-                is_inside, next_x = is_in_polygon((x,y))
-                if not is_inside:
+                if not is_in_polygon((x,y)):
                     is_valid_rectangle = False
                     continue
                 else:
-                    x = next_x + 1
+                    x += 1
         if is_valid_rectangle:
             largest_area = potential_rectangle_area
             area_points = point_a, point_b
 print(largest_area)
 # 10622324 too low
 # 30872120 too low :(((
+# 4749900512 too high

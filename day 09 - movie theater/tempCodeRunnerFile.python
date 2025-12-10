@@ -1,0 +1,2 @@
+
+    other_points = filter(lambda x: x[0] >= point_a[0], POLYGON)
