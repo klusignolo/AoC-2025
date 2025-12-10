@@ -1,0 +1,54 @@
+with open("test_input.txt", "r") as file:
+    POLYGON = [(int(coordinate.split(",")[0]), int(coordinate.split(",")[1])) for coordinate in file.read().splitlines()]
+
+def is_in_polygon(point: tuple[int,int]) -> bool:
+    x,y = point
+    n = len(POLYGON)
+    intersection_count = 0
+    for i in range(n):
+        
+        x1, y1 = POLYGON[i]
+        x2, y2 = POLYGON[(i + 1) % n]
+        
+        if (y1 > y) != (y2 > y):
+            slope_reciprocal = (x2 - x1) / (y2 - y1) 
+            x_intersect = slope_reciprocal * (y - y1) + x1
+            
+            if x < x_intersect:
+                intersection_count += 1
+                
+    return intersection_count % 2 == 1
+
+largest_area = 0
+area_points = None
+points_to_count = len(POLYGON)
+points_counted = 0
+for point_a in POLYGON:
+    points_counted += 1
+    print(f"Counted {points_counted}/{points_to_count}")
+    # For each point, compare against all polygon points to the right.
+    other_points = filter(lambda x: x[0] >= point_a[0], POLYGON)
+    for point_b in other_points:
+        x1,y1 = point_a
+        x2,y2 = point_b
+        potential_rectangle_area = abs((x2 - x1 + 1)*(y2 - y1 + 1))
+        # Determine if a rectangle can be formed that is larger than the current largest rectangle
+        if largest_area >= potential_rectangle_area: continue
+
+        is_valid_rectangle = True
+        for y in range(min(y1,y2), max(y1,y2)+1):
+            if not is_valid_rectangle: break
+            x = x1
+            while x < x2+1: 
+                if not is_valid_rectangle: break
+                if not is_in_polygon((x,y)):
+                    is_valid_rectangle = False
+                    continue
+                else:
+                    x += 1
+        if is_valid_rectangle:
+            largest_area = potential_rectangle_area
+            area_points = point_a, point_b
+print(largest_area)
+# 10622324 too low
+# 30872120 too low :(((

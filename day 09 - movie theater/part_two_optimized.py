@@ -27,22 +27,21 @@ def is_in_polygon(point: tuple[int,int]) -> bool:
             left_x = min(x1,x2)
             right_x = max(x1,x2)
             if x <= right_x and x >= left_x:
-                return True # point falls on a horizontal line
+                return True, right_x # point falls on a horizontal line
 
-    intersection_count = 0
+    intersections = []
     for vertical_line in VERTICAL_LINES:
         x1,y1 = vertical_line[0]
         y2 = vertical_line[1][1]
-        y_top = max(y1,y2)
-        y_bottom = min(y1,y2)
         if x > x1: 
             continue # point falls to the right of the vertical line
-        elif x == x1 and y <= y_top and y >= y_bottom: 
-            return True # point falls on a vertical line
-        elif y <= y_top and y >= y_bottom:
-            intersection_count += 1 # point falls to the left of the vertical line
-    return intersection_count % 2 == 1
-
+        y_top = max(y1,y2)
+        y_bottom = min(y1,y2)
+        if x == x1 and y <= y_top and y >= y_bottom: 
+            return True, x # point falls on a vertical line
+        elif y <= y_top and y > y_bottom:
+            intersections.append(x1) # point falls to the left of the vertical line
+    return len(intersections) % 2 == 1, x if len(intersections) == 0 else min(intersections)
 
 largest_area = 0
 area_points = None
@@ -61,12 +60,20 @@ for point_a in POLYGON:
         if largest_area >= potential_rectangle_area: continue
 
         is_valid_rectangle = True
-        for x in range(x1, x2+1):
+        for y in range(min(y1,y2), max(y1,y2)+1):
             if not is_valid_rectangle: break
-            for y in range(min(y1,y2), max(y1,y2)+1):
+            x = x1
+            while x < x2+1: 
                 if not is_valid_rectangle: break
-                is_valid_rectangle = is_in_polygon((x,y))
+                is_inside, next_x = is_in_polygon((x,y))
+                if not is_inside:
+                    is_valid_rectangle = False
+                    continue
+                else:
+                    x = next_x + 1
         if is_valid_rectangle:
             largest_area = potential_rectangle_area
             area_points = point_a, point_b
 print(largest_area)
+# 10622324 too low
+# 30872120 too low :(((
