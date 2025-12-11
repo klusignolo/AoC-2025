@@ -1,49 +1,97 @@
-from itertools import combinations
 import re
-with open("test_input.txt", "r") as file:
+with open("input.txt", "r") as file:
     lines = file.read().splitlines()
+CURRENT_MAX_PATH = float('inf')
+STARTING_MAX_PATH = float('inf')
+class JoltagePath:
+    def __init__(self, joltage: list[int], parent=None) -> None:
+        self.parent = parent
+        self.joltage = joltage
+        self.length = parent.length + 1 if parent is not None else 0
 
-PRIMES = [3,5,7,11,13,17,19,23,29,31,37,41,43,47,53]
+    def is_solved(self) -> bool:
+        return all(joltage == 0 for joltage in self.joltage)
+    def is_valid(self) -> bool:
+        if not all(joltage >= 0 for joltage in self.joltage):
+            return False
+        
+        global CURRENT_MAX_PATH
+
+        minimum_remaining_move_count = max(self.joltage)
+        maximum_allowable_move_count = CURRENT_MAX_PATH - self.length - 1
+        if minimum_remaining_move_count > maximum_allowable_move_count:
+            return False
+        return True
+    
+def apply_button_press(input_joltage: list[int], button: list[int]) -> list[int]:
+    new_joltages = input_joltage.copy()
+    for index in button:
+        new_joltages[index] -= 1
+    return new_joltages
+
+def button_value(input_joltage: list[int], button: list[int]) -> int:
+    value = 0
+    for index in button:
+        if input_joltage[index] == 0:
+            return 0
+        value += input_joltage[index]
+    return value
+
+def get_smallest_path(input_path: JoltagePath, buttons: list[list[int]]) -> list[list[int]]:
+    global CURRENT_MAX_PATH
+    global STARTING_MAX_PATH
+    if input_path.length >= CURRENT_MAX_PATH-1:
+        return float('inf')
+    
+    next_paths = []
+    buttons.sort(key=lambda x: -button_value(input_path.joltage, x))
+        # check how far we are from max path.
+        # If the top button score * remaining moves is less than the remaining joltage, we can prune
+
+    
+    for button in buttons:
+        new_joltage = apply_button_press(input_path.joltage, button)
+        next_path = JoltagePath(new_joltage, input_path)
+        if next_path.is_solved():
+            CURRENT_MAX_PATH = min(CURRENT_MAX_PATH, next_path.length)
+            print(f"New MAX PATH: {CURRENT_MAX_PATH}")
+            return next_path.length
+        if next_path.is_valid():
+            next_paths.append(next_path)
+
+    if len(next_paths) == 0:
+        return float('inf')
+    return min(get_smallest_path(path, buttons) for path in next_paths)
+
 class Machine:
-    def __init__(self, target: int, switches: list[int], joltages: list[int]) -> None:
-        self.target = target
-        self.switches = sorted(switches, reverse=True)
+    def __init__(self, buttons: list[int], joltages: list[int]) -> None:
+        self.buttons = sorted(buttons, reverse=True)
         self.joltages = joltages.copy()
-        self.joltage_target = 1
-        for i in range(len(joltages)):
-            self.joltage_target *= PRIMES[i] ** joltages[i]
-
-
+    
     def solve(self) -> int:
-        buttton_count = 0
-        previous_target = self.joltage_target
-        while self.joltage_target > 1:
-            print(self.joltage_target)
-            for switch in self.switches:
-                if self.joltage_target % switch == 0:
-                    buttton_count += 1
-                    self.joltage_target /= switch
-            if self.joltage_target == previous_target:
-                print("SHIT")
-            else:
-                previous_target = self.joltage_target
-        return buttton_count
+        global STARTING_MAX_PATH
+        global CURRENT_MAX_PATH
+        STARTING_MAX_PATH = sum(self.joltages)
+        CURRENT_MAX_PATH = STARTING_MAX_PATH
+        initial_path = JoltagePath(self.joltages)
+        return get_smallest_path(initial_path, self.buttons)
+
 
 machines: list[Machine] = []
 for line in lines:
-    target_str = line.split("]")[0].strip("[").replace(".","0").replace("#","1")
-    target = int("".join(reversed(target_str)), 2)
-    switches_str = re.findall(r"\((.*?)\)", line)
-    switches = []
-    for switch_str in switches_str:
-        indices = [int(x) for x in switch_str.split(",")]
-        switch = 1
-        for i in indices:
-            switch *= PRIMES[i]
-        switches.append(switch)
+    buttons_str = re.findall(r"\((.*?)\)", line)
+    buttons = []
+    for button_str in buttons_str:
+        buttons.append([int(x) for x in button_str.split(",")])
+    buttons.sort(key=lambda x: -len(x))
     joltages = [int(x) for x in line.split("{")[1].strip("}").split(",")]
-    machines.append(Machine(target, switches, joltages))
-lowest_number_of_moves = 0
+    machines.append(Machine(buttons, joltages))
+answer = 0
+current_machine_index = 0
 for machine in machines:
-    lowest_number_of_moves += machine.solve()
-print(lowest_number_of_moves)
+    lowest_number_of_moves = machine.solve()
+    print(f"Machine {current_machine_index}/{len(machines)} solved: {lowest_number_of_moves} moves")
+    answer += lowest_number_of_moves
+    current_machine_index += 1
+print(answer)
+# 16444 too low :(((())))
